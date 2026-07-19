@@ -1,0 +1,29 @@
+data/
+venv/
+.venv/
+.env
+data/
+*.csv
+*.json
+*.log
+*.db
+__pycache__/
+*.pyc 
+/config.local
+/tmp
+/cache
+logs/
+# --- Backend / Python ignores ---
+__pycache__/
+*.pyc
+venv/
+.env
+
+# --- Frontend Ignores (Told from the root perspective) ---
+frontend/node_modules/
+frontend/build/
+frontend/dist/
+frontend/.env*
+frontend/*debug.log*
+*.log
+node_modules/
