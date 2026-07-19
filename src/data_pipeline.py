@@ -2,20 +2,18 @@ import os
 import logging
 import pandas as pd
 import numpy as np
-from datetime import datetime
 
-# Setup robust logging telemetry
+# Setup logging telemetry
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("SelamForecastingPipeline")
 
 class UnifiedDataPipeline:
-    def __init__(self, data_path: str, reference_path: str):
-        self.data_path = data_path
+    def __init__(self, raw_data_path: str, reference_path: str):
+        self.raw_data_path = raw_data_path
         self.reference_path = reference_path
         self.df_unified = None
         self.df_refs = None
         
-        # Expected Canonical Structural Layout
         self.expected_columns = [
             'record_id', 'record_type', 'pillar', 'category', 'indicator', 
             'indicator_code', 'value_numeric', 'observation_date', 'source_name', 
@@ -24,66 +22,41 @@ class UnifiedDataPipeline:
         ]
 
     def load_datasets(self) -> "UnifiedDataPipeline":
-        """Reads inputs and validates physical file presence defensively."""
-        logger.info("Initializing dataset acquisition workflow...")
-        for path in [self.data_path, self.reference_path]:
+        """Reads raw assets defensively."""
+        logger.info("Initializing raw data acquisition...")
+        for path in [self.raw_data_path, self.reference_path]:
             if not os.path.exists(path):
-                raise FileNotFoundError(f"Critical System Failure: Required data layer asset missing at {path}")
+                raise FileNotFoundError(f"Critical Error: Missing baseline input file at {path}")
         
-        self.df_unified = pd.read_csv(self.data_path)
+        self.df_unified = pd.read_csv(self.raw_data_path)
         self.df_refs = pd.read_csv(self.reference_path)
-        logger.info(f"Successfully loaded {len(self.df_unified)} records from data layer.")
+        logger.info(f"Loaded {len(self.df_unified)} raw records.")
         return self
 
     def enforce_schema_and_types(self) -> "UnifiedDataPipeline":
-        """Ensures rigid column mapping, date structures, and type normalization."""
+        """Ensures column alignment and type normalization."""
         if self.df_unified is None:
-            raise ValueError("Pipeline state error: Execute load_datasets before structural normalization.")
+            raise ValueError("Pipeline state error: Execute load_datasets before normalization.")
         
-        # Guard against column variance by filling structural voids safely
         for col in self.expected_columns:
             if col not in self.df_unified.columns:
                 self.df_unified[col] = np.nan
         
-        # Strict structural ordering alignment
         self.df_unified = self.df_unified[self.expected_columns]
         
-        # Type Coercion & Standardization Rules
         self.df_unified['record_id'] = self.df_unified['record_id'].astype(str)
         self.df_unified['record_type'] = self.df_unified['record_type'].astype(str).str.strip().str.lower()
         self.df_unified['value_numeric'] = pd.to_numeric(self.df_unified['value_numeric'], errors='coerce')
         self.df_unified['observation_date'] = pd.to_datetime(self.df_unified['observation_date'], errors='coerce')
         
-        logger.info("Schema structural invariants verified and locked.")
+        logger.info("Schema structural invariants verified.")
         return self
 
-    def profile_data_distributions(self):
-        """Executes full diagnostic sweep for task verification reporting."""
-        logger.info("Executing diagnostic profile analysis...")
-        
-        counts = {
-            "record_type": self.df_unified['record_type'].value_counts(dropna=False).to_dict(),
-            "pillar": self.df_unified['pillar'].value_counts(dropna=False).to_dict(),
-            "confidence": self.df_unified['confidence'].value_counts(dropna=False).to_dict()
-        }
-        
-        obs_slice = self.df_unified[self.df_unified['record_type'] == 'observation']
-        temporal_range = ("N/A", "N/A")
-        if not obs_slice.empty and obs_slice['observation_date'].notna().any():
-            temporal_range = (obs_slice['observation_date'].min().strftime('%Y-%m-%d'), 
-                              obs_slice['observation_date'].max().strftime('%Y-%m-%d'))
-            
-        unique_indicators = self.df_unified['indicator_code'].dropna().unique().tolist()
-        
-        logger.info("Diagnostics compiled successfully.")
-        return counts, temporal_range, unique_indicators
-
     def inject_enriched_records(self, enrichment_records: list) -> "UnifiedDataPipeline":
-        """Safely appends structured dictionary logs while executing input assertions."""
-        logger.info(f"Injecting {len(enrichment_records)} verified auxiliary records into pipeline memory...")
+        """Appends verified records into memory."""
+        logger.info(f"Injecting {len(enrichment_records)} enriched records...")
         df_new = pd.DataFrame(enrichment_records)
         
-        # Execute basic input assertions against the baseline data structures
         for col in self.expected_columns:
             if col not in df_new.columns:
                 df_new[col] = np.nan
@@ -93,32 +66,22 @@ class UnifiedDataPipeline:
         self.enforce_schema_and_types()
         return self
 
-    def save_and_commit_data_layer(self, export_path: str):
-        """Writes back to file system cleanly."""
-        if self.df_unified is None:
-            raise ValueError("State validation failure: Data tracking registry holds null structure.")
-        self.df_unified.to_csv(export_path, index=False)
-        logger.info(f"Production system synced. State written to {export_path}")
+    def save_processed_data(self, output_path: str):
+        """Saves output into data/processed directory."""
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        self.df_unified.to_csv(output_path, index=False)
+        logger.info(f"Processed dataset successfully written to: {output_path}")
 
-# Concrete Execution block for pipeline integration
 if __name__ == "__main__":
-    # Define relative structural roots
-    DATA_IN = "data/raw/ethiopia_fi_unified_data.csv"
-    REFS_IN = "data/raw/reference_codes.csv"
-    DATA_OUT = "data/processed/ethiopia_fi_unified_data_processed.csv"
-    
-    # Generate mock starter environments if missing for standalone integration testing
-    if not os.path.exists("data"):
-        os.makedirs("data")
-    if not os.path.exists(DATA_IN):
-        pd.DataFrame(columns=['record_id', 'record_type', 'pillar', 'value_numeric', 'indicator_code', 'observation_date']).to_csv(DATA_IN, index=False)
-    if not os.path.exists(REFS_IN):
-        pd.DataFrame({'code_type': ['PILLAR'], 'valid_value': ['ACCESS']}).to_csv(REFS_IN, index=False)
+    # Explicit directory routing
+    RAW_DATA_PATH = "data/raw/ethiopia_fi_unified_data.csv"
+    REF_DATA_PATH = "data/raw/reference_codes.csv"
+    PROCESSED_DATA_PATH = "data/processed/ethiopia_fi_unified_data_processed.csv"
 
-    pipeline = UnifiedDataPipeline(DATA_IN, REFS_IN).load_datasets().enforce_schema_and_types()
-    
-    # Formulate verified operational data matrices for structural adjustments
-    historical_enrichment_pool = [
+    pipeline = UnifiedDataPipeline(RAW_DATA_PATH, REF_DATA_PATH).load_datasets().enforce_schema_and_types()
+
+    # Enriched payload tracking Findex gender splits and central bank policy shocks
+    enrichment_payload = [
         {
             'record_id': 'ENR_OBS_001', 'record_type': 'observation', 'pillar': 'ACCESS',
             'category': 'demographic_findex', 'indicator': 'Account Ownership Rate, Female',
@@ -146,9 +109,9 @@ if __name__ == "__main__":
             'value_numeric': np.nan, 'observation_date': np.nan,
             'parent_id': 'ENR_EVT_003', 'related_indicator': 'MOBILE_MONEY_ACC',
             'impact_direction': 'positive', 'impact_magnitude': 'high',
-            'lag_months': 12, 'evidence_basis': 'Catalyzed the creation and structural expansion of Telebirr and M-Pesa channels.'
+            'lag_months': 12, 'evidence_basis': 'Direct catalyst for non-bank payment operator entries (Telebirr, M-Pesa).'
         }
     ]
-    
-    pipeline.inject_enriched_records(historical_enrichment_pool)
-    pipeline.save_and_commit_data_layer(DATA_OUT)
+
+    pipeline.inject_enriched_records(enrichment_payload)
+    pipeline.save_processed_data(PROCESSED_DATA_PATH)
